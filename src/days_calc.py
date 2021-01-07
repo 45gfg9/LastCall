@@ -1,3 +1,4 @@
+# A bare Date class
 class Date:
     def __init__(self, y: int, m: int, d: int):
         self.y = y
@@ -54,5 +55,5 @@ class Date:
 
 if __name__ == '__main__':
     base = Date(2021, 1, 1)
-    target = Date(2022, 6, 7)
+    target = Date(2022, 6, 7) # Change this to your desired date
     print(target - base)

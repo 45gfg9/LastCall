@@ -1,10 +1,10 @@
 #include "Date.h"
 
-const byte DAYS_IN_MONTH[] {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+const byte DIM[] {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 #define LP(m, y) ((m) == 2 && !((y) % 4))
 #define ACC(v, s, d, y)         \
     for (int m = s; m < d; m++) \
-    v += DAYS_IN_MONTH[m - 1] + LP(m, y)
+    v += DIM[m - 1] + LP(m, y)
 
 bool Date::operator==(const Date &o) const
 {
