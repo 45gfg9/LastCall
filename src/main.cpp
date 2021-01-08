@@ -1,5 +1,6 @@
-#include <Arduino.h>
 #include <avr/sleep.h>
+#include <Arduino.h>
+#include <EEPROM.h>
 
 // 74HC595 Output Enable (LOW trigger)
 #define OE 0
@@ -15,11 +16,6 @@
 #define RL A0
 
 #define DIGITS 3
-
-// Days from 2021.1.1 to 2022.6.7
-// Converted to raw int for maximum optimizations
-// `days_calc.py` helps do calculations
-const int TARGET = 522;
 
 // Days In Months
 const byte DIM[] PROGMEM{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -38,18 +34,30 @@ const byte p[] PROGMEM{
     0b11110110,
 };
 
-// this function reads DS1302 and
-// calculates days left
-int readDaysLeft();
+const byte LIGHT_E2ADDR = 0x00;
+const byte TOLERANT_E2ADDR = 0x02;
+const byte DAYS_E2ADDR = 0x04;
 
-// output val to display
-// least significant digit first
+word lightBase;
+word lightTolerant;
+word targetDays;
+
+word curr;
+
+// damn this takes 100B
+word bcd2bin(word bcd) { return bcd - 6 * (bcd >> 4); }
+word readDaysLeft();
 void disp(int val);
 
 void setup()
 {
   // Only idle mode retains Overflow Interrupt
   set_sleep_mode(SLEEP_MODE_IDLE);
+
+  // read config
+  EEPROM.get(LIGHT_E2ADDR, lightBase);
+  EEPROM.get(TOLERANT_E2ADDR, lightTolerant);
+  EEPROM.get(DAYS_E2ADDR, targetDays);
 
   pinMode(OE, OUTPUT);
   pinMode(LCK, OUTPUT);
@@ -73,18 +81,19 @@ ISR(TIM0_OVF_vect)
   // runs about every 2s
   // time to update!
 
-  int result = analogRead(RL);
-  if (result > 200)
+  word result = analogRead(RL);
+  if (digitalRead(OE))
   {
     // TODO
   }
   disp(readDaysLeft());
 }
 
-int readDaysLeft()
+// reads DS1302 and calculates days left
+word readDaysLeft()
 {
   // Pt I
-  // receive data from DS1302
+  // retrieve data from DS1302
 
   digitalWrite(SCK, HIGH);
 
@@ -93,13 +102,13 @@ int readDaysLeft()
   pinMode(DAT, OUTPUT);
   shiftOut(DAT, SCK, LSBFIRST, 0xBF);
   pinMode(DAT, INPUT);
-  shiftIn(DAT, SCK, LSBFIRST);          // second
-  shiftIn(DAT, SCK, LSBFIRST);          // minute
-  shiftIn(DAT, SCK, LSBFIRST);          // hour
-  byte d = shiftIn(DAT, SCK, LSBFIRST); // date
-  byte m = shiftIn(DAT, SCK, LSBFIRST); // month
-  shiftIn(DAT, SCK, LSBFIRST);          // day of week
-  byte y = shiftIn(DAT, SCK, LSBFIRST); // year
+  shiftIn(DAT, SCK, LSBFIRST);                   // second
+  shiftIn(DAT, SCK, LSBFIRST);                   // minute
+  shiftIn(DAT, SCK, LSBFIRST);                   // hour
+  byte d = bcd2bin(shiftIn(DAT, SCK, LSBFIRST)); // date
+  byte m = bcd2bin(shiftIn(DAT, SCK, LSBFIRST)); // month
+  shiftIn(DAT, SCK, LSBFIRST);                   // day of week
+  byte y = bcd2bin(shiftIn(DAT, SCK, LSBFIRST)); // year
 
   digitalWrite(SCK, LOW);
 
@@ -112,7 +121,7 @@ int readDaysLeft()
   // this logic is very specific to base date (2021.1.1)
   // you may rewrite this part if your base is not 1.1
   // "I dont know why, it just works"
-  int ds = -1;                        // begin with Jan 1
+  word ds = -1;                       // begin with Jan 1
   if (y != 21)                        // if not (20)21
     for (; y > 21; y--)               // for each year
       ds += 365;                      // add extra 365 days
@@ -120,17 +129,17 @@ int readDaysLeft()
     ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
   ds += d;                            // add remaining days (current month)
 
-  return TARGET - ds;
+  return targetDays - ds;
 }
 
+// output val to display
+// least significant digit first
 void disp(int val)
 {
-  int dgts = DIGITS;
-
   pinMode(DAT, OUTPUT);
   digitalWrite(LCK, LOW);
   // %03d
-  while (dgts--)
+  for (byte i = 0; i < DIGITS; i++)
   {
     shiftOut(DAT, SCK, LSBFIRST, pgm_read_byte(p + (val % 10)));
     val /= 10;

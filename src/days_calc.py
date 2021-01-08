@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # A bare Date class
 class Date:
     def __init__(self, y: int, m: int, d: int):
