@@ -42,11 +42,11 @@ word lightBase;
 word lightTolerant;
 word targetDays;
 
-word curr;
+word curr = -1;
 
-// damn this takes 100B
-word bcd2bin(word bcd) { return bcd - 6 * (bcd >> 4); }
-word readDaysLeft();
+inline word bcd2bin(word bcd) { return bcd - 6 * (bcd >> 4); }
+
+word getDaysLeft();
 void disp(int val);
 
 void setup()
@@ -81,16 +81,23 @@ ISR(TIM0_OVF_vect)
   // runs about every 2s
   // time to update!
 
-  word result = analogRead(RL);
-  if (digitalRead(OE))
+  word lval = analogRead(RL);
+
+  // if OE == LOW threshold = base + tolerant
+  // else threshold = base - tolerant
+  digitalWrite(OE,
+               (lval > lightBase + (digitalRead(OE) ? lightTolerant : -lightTolerant)));
+
+  word left = getDaysLeft();
+  if (curr != left)
   {
-    // TODO
+    curr = left;
+    disp(curr);
   }
-  disp(readDaysLeft());
 }
 
 // reads DS1302 and calculates days left
-word readDaysLeft()
+word getDaysLeft()
 {
   // Pt I
   // retrieve data from DS1302
@@ -129,7 +136,9 @@ word readDaysLeft()
     ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
   ds += d;                            // add remaining days (current month)
 
-  return targetDays - ds;
+  word left = targetDays - ds;
+
+  return left > 0 ? left : 0;
 }
 
 // output val to display
