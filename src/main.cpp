@@ -17,6 +17,8 @@
 
 #define DIGITS 3
 
+#define E2_WORD(n) (sizeof(word) * (n))
+
 // Days In Months
 const byte DIM[] PROGMEM{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
@@ -34,17 +36,17 @@ const byte p[] PROGMEM{
     0b11110110,
 };
 
-const byte LIGHT_E2ADDR = 0x00;
-const byte TOLERANT_E2ADDR = 0x02;
-const byte DAYS_E2ADDR = 0x04;
+#define E2_LIGHT E2_WORD(0)
+#define E2_TOLERANT E2_WORD(1)
+#define E2_DAYS E2_WORD(2)
 
 word lightBase;
 word lightTolerant;
 word targetDays;
 
-word curr = -1;
+volatile word curr = -1;
 
-inline word bcd2bin(word bcd) { return bcd - 6 * (bcd >> 4); }
+word __attribute__((noinline)) bcd2bin(word bcd) { return bcd - 6 * (bcd >> 4); }
 
 word getDaysLeft();
 void disp(int val);
@@ -55,9 +57,9 @@ void setup()
   set_sleep_mode(SLEEP_MODE_IDLE);
 
   // read config
-  EEPROM.get(LIGHT_E2ADDR, lightBase);
-  EEPROM.get(TOLERANT_E2ADDR, lightTolerant);
-  EEPROM.get(DAYS_E2ADDR, targetDays);
+  EEPROM.get(E2_LIGHT, lightBase);
+  EEPROM.get(E2_TOLERANT, lightTolerant);
+  EEPROM.get(E2_DAYS, targetDays);
 
   pinMode(OE, OUTPUT);
   pinMode(LCK, OUTPUT);
@@ -67,17 +69,19 @@ void setup()
   TCCR0B = _BV(CS02) | _BV(CS00); // Prescaler: clk / 1024
   TIMSK0 = _BV(TOIE0);            // Enable Timer 0 Overflow Interrupt
 
+  sleep_enable();
   sei(); // of course you would enable global interrupt
 }
 
 void loop()
 {
   // Minimize power usage
-  sleep_mode();
+  sleep_cpu();
 }
 
 ISR(TIM0_OVF_vect)
 {
+  cli();
   // runs about every 2s
   // time to update!
 
@@ -94,6 +98,8 @@ ISR(TIM0_OVF_vect)
     curr = left;
     disp(curr);
   }
+
+  sei();
 }
 
 // reads DS1302 and calculates days left
@@ -127,12 +133,12 @@ word getDaysLeft()
 
   // this logic is very specific to base date (2021.1.1)
   // you may rewrite this part if your base is not 1.1
-  // "I dont know why, it just works"
+  // "I don't know why, it just works"
   word ds = -1;                       // begin with Jan 1
   if (y != 21)                        // if not (20)21
     for (; y > 21; y--)               // for each year
       ds += 365;                      // add extra 365 days
-  for (m--; m > 0; m--)               // for each month unspent this year
+  for (m--; m; m--)                   // for each month unspent this year
     ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
   ds += d;                            // add remaining days (current month)
 
@@ -148,7 +154,7 @@ void disp(int val)
   pinMode(DAT, OUTPUT);
   digitalWrite(LCK, LOW);
   // %03d
-  for (byte i = 0; i < DIGITS; i++)
+  for (byte i = DIGITS; i; i--)
   {
     shiftOut(DAT, SCK, LSBFIRST, pgm_read_byte(p + (val % 10)));
     val /= 10;
