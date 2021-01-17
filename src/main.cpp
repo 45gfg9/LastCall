@@ -22,18 +22,19 @@
 // Days In Months
 const byte DIM[] PROGMEM{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-// digits for 0~9 digits
+// 0~9 digits
+// Bitwise NOTed for common anode
 const byte p[] PROGMEM{
-    0b11111100,
-    0b01100000,
-    0b11011010,
-    0b11110010,
-    0b01100110,
-    0b10110110,
-    0b10111110,
-    0b11100000,
-    0b11111110,
-    0b11110110,
+    (byte)~0b11111100,
+    (byte)~0b01100000,
+    (byte)~0b11011010,
+    (byte)~0b11110010,
+    (byte)~0b01100110,
+    (byte)~0b10110110,
+    (byte)~0b10111110,
+    (byte)~0b11100000,
+    (byte)~0b11111110,
+    (byte)~0b11110110,
 };
 
 #define E2_LIGHT E2_WORD(0)
@@ -87,10 +88,10 @@ ISR(TIM0_OVF_vect)
 
   word lval = analogRead(RL);
 
-  // if OE == LOW threshold = base + tolerant
-  // else threshold = base - tolerant
+  // if OE == HIGH threshold = base - tolerant
+  // else threshold = base + tolerant
   digitalWrite(OE,
-               (lval > lightBase + (digitalRead(OE) ? lightTolerant : -lightTolerant)));
+               (lval > lightBase + (digitalRead(OE) ? -lightTolerant : lightTolerant)));
 
   word left = getDaysLeft();
   if (curr != left)
