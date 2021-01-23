@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-# A bare Date class
+# Warning
+# This script counts leap year while the sketch doesn't
+
+# A bare Date class for calculation
 class Date:
     def __init__(self, y: int, m: int, d: int):
         self.y = y
