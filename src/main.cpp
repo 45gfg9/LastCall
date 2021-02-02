@@ -1,24 +1,26 @@
-#include <avr/sleep.h>
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <avr/sleep.h>
+#include <avr/power.h>
+#include <time.h>
 
 // 74HC595 Register Lock (LOW trigger)
-#define LCK 3
+#define LCK PB3
 // DS1302 CE pin (HIGH trigger)
-#define CE 4
+#define CE PB4
 // Shared SCK pin
-#define SCK 2
+#define SCK PB2
 // Shared IO/DAT pin
-#define DAT 0
+#define DAT PB0
 
 #define DIGITS 3
 
 // Days In Months
-const byte DIM[] PROGMEM{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+const byte DIM[] PROGMEM {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 // 0~9 digits
 // Bitwise NOTed for common anode
-const byte p[] PROGMEM{
+const byte p[] PROGMEM {
     (byte)~0b11111100,
     (byte)~0b01100000,
     (byte)~0b11011010,
@@ -35,54 +37,46 @@ word targetDays;
 
 volatile word curr = -1;
 
-byte __attribute__((noinline)) bcd2bin(byte bcd) { return bcd - 6 * (bcd >> 4); }
+__attribute__((noinline)) byte bcd2bin(byte bcd) {
+  return bcd - 6 * (bcd >> 4);
+}
 
 word getDaysLeft();
-void disp(int val);
+void disp(word val);
 
-void setup()
-{
-  pinMode(SCK, OUTPUT);
-  pinMode(LCK, OUTPUT);
-  pinMode(CE, OUTPUT);
+void setup() {
+  EEPROM.get(EDADR, targetDays); // read config
 
+  DDRB = _BV(CE) | _BV(LCK) | _BV(SCK); // Set these mode to output
   digitalWrite(LCK, HIGH);
-  digitalWrite(CE, LOW);
 
-  // read config
-  EEPROM.get(EDADR, targetDays);
-
-  // Only idle mode retains Overflow Interrupt
-  set_sleep_mode(SLEEP_MODE_IDLE);
-
-  TCCR0B = _BV(CS02) | _BV(CS00); // Prescaler: clk / 1024
+  TCCR0B = _BV(CS02) | _BV(CS00); // Prescaler: clk_IO / 1024
   TIMSK0 = _BV(TOIE0);            // Enable Timer 0 Overflow Interrupt
 
+  set_sleep_mode(SLEEP_MODE_IDLE); // Only idle mode retains Overflow Interrupt
+  power_adc_disable();             // ADC unused, ATtiny13A supports picoPower
   sleep_enable();
-  sei(); // of course you would enable global interrupt
+  sei(); // of course you would enable interrupt globally
 }
 
-void loop()
-{
-  // Minimize power usage
-  sleep_cpu();
+void loop() {
+  sleep_bod_disable(); // You don't operate when sleeping so
+  sleep_cpu();         // Minimize power usage
 }
 
-ISR(TIM0_OVF_vect)
-{
-  // runs about every 2s
+ISR(TIM0_OVF_vect) {
+  // runs about every 2.048s
   // time to update!
+
   word left = getDaysLeft();
-  if (curr != left)
-  {
+  if (curr != left) {
     curr = left;
     disp(curr);
   }
 }
 
 // reads DS1302 and calculates days left
-word getDaysLeft()
-{
+word getDaysLeft() {
   // Pt I
   // retrieve data from DS1302
 
@@ -126,13 +120,11 @@ word getDaysLeft()
 
 // output val to display
 // least significant digit first
-void disp(int val)
-{
+void disp(word val) {
   pinMode(DAT, OUTPUT);
   digitalWrite(LCK, LOW);
   // %03d
-  for (byte i = DIGITS; i; i--)
-  {
+  for (byte i = DIGITS; i; i--) {
     shiftOut(DAT, SCK, LSBFIRST, pgm_read_byte(p + (val % 10)));
     val /= 10;
   }
