@@ -2,7 +2,6 @@
 #include <EEPROM.h>
 #include <avr/sleep.h>
 #include <avr/power.h>
-#include <time.h>
 
 // 74HC595 Register Lock (LOW trigger)
 #define LCK PB3
