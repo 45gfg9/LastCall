@@ -34,9 +34,7 @@ const byte p[] PROGMEM {
 
 word targetDays;
 
-volatile word curr = -1;
-
-__attribute__((noinline)) byte bcd2bin(byte bcd) {
+byte bcd2bin(byte bcd) {
   return bcd - 6 * (bcd >> 4);
 }
 
@@ -46,16 +44,16 @@ void disp(word val);
 void setup() {
   EEPROM.get(EDADR, targetDays); // read config
 
-  DDRB = _BV(CE) | _BV(LCK) | _BV(SCK); // Set these mode to output
+  DDRB = _BV(CE) | _BV(LCK) | _BV(SCK); // Set these pins to output
   digitalWrite(LCK, HIGH);
 
-  TCCR0B = _BV(CS02) | _BV(CS00); // Prescaler: clk_IO / 1024
-  TIMSK0 = _BV(TOIE0);            // Enable Timer 0 Overflow Interrupt
+  bitSet(PCMSK, PCINT1); // INT on PB1
+  bitSet(GIMSK, PCIE);   // Enable PCINT
 
-  set_sleep_mode(SLEEP_MODE_IDLE); // Only idle mode retains Overflow Interrupt
-  power_adc_disable();             // ADC unused, ATtiny13A supports picoPower
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  power_all_disable(); // picoPower
   sleep_enable();
-  sei(); // of course you would enable interrupt globally
+  sei();
 }
 
 void loop() {
@@ -63,15 +61,10 @@ void loop() {
   sleep_cpu();         // Minimize power usage
 }
 
-ISR(TIM0_OVF_vect) {
-  // runs about every 2.048s
-  // time to update!
-
-  word left = getDaysLeft();
-  if (curr != left) {
-    curr = left;
-    disp(curr);
-  }
+ISR(PCINT0_vect) {
+  if (digitalRead(1))
+    return;            // Display off
+  disp(getDaysLeft()); // Display on
 }
 
 // reads DS1302 and calculates days left
