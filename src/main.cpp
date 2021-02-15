@@ -34,12 +34,7 @@ const byte p[] PROGMEM {
 
 word targetDays;
 
-byte bcd2bin(byte bcd) {
-  return bcd - 6 * (bcd >> 4);
-}
-
-word getDaysLeft();
-void disp(word val);
+void run();
 
 void setup() {
   EEPROM.get(EDADR, targetDays); // read config
@@ -49,9 +44,11 @@ void setup() {
 
   bitSet(PCMSK, PCINT1); // INT on PB1
   bitSet(GIMSK, PCIE);   // Enable PCINT
-
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   power_all_disable(); // picoPower
+
+  run();
+
   sleep_enable();
   sei();
 }
@@ -63,8 +60,12 @@ void loop() {
 
 ISR(PCINT0_vect) {
   if (digitalRead(1))
-    return;            // Display off
-  disp(getDaysLeft()); // Display on
+    return; // Display off
+  run();    // Display on
+}
+
+byte bcd2bin(byte bcd) {
+  return bcd - 6 * (bcd >> 4);
 }
 
 // reads DS1302 and calculates days left
@@ -121,4 +122,8 @@ void disp(word val) {
     val /= 10;
   }
   digitalWrite(LCK, HIGH);
+}
+
+void run() {
+  disp(getDaysLeft());
 }
