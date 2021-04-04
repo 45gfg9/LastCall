@@ -3,6 +3,8 @@
 #include <avr/sleep.h>
 #include <avr/power.h>
 
+// 74HC595 Output Enable (LOW trigger)
+#define OE PB1
 // 74HC595 Register Lock (LOW trigger)
 #define LCK PB3
 // DS1302 CE pin (HIGH trigger)
@@ -42,8 +44,8 @@ void setup() {
   DDRB = _BV(CE) | _BV(LCK) | _BV(SCK); // Set these pins to output
   digitalWrite(LCK, HIGH);
 
-  bitSet(PCMSK, PCINT1); // INT on PB1
-  bitSet(GIMSK, PCIE);   // Enable PCINT
+  bitSet(PCMSK, OE);   // INT on OE
+  bitSet(GIMSK, PCIE); // Enable PCINT
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   power_all_disable(); // picoPower
 
