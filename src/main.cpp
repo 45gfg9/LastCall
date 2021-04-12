@@ -34,13 +34,9 @@ const byte p[] PROGMEM {
     (byte)~0b11110110,
 };
 
-word targetDays;
-
 void run();
 
 void setup() {
-  EEPROM.get(EDADR, targetDays); // read config
-
   DDRB = _BV(CE) | _BV(LCK) | _BV(SCK); // Set these pins to output
   digitalWrite(LCK, HIGH);
 
@@ -120,6 +116,9 @@ word getDaysLeft() {
   for (m--; m; m--)                   // for each month unspent this year
     ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
   ds += d;                            // add remaining days (current month)
+
+  word targetDays;
+  EEPROM.get(EDADR, targetDays); // read config
 
   word left = targetDays - ds;
 
