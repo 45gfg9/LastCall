@@ -56,18 +56,31 @@ void setup() {
 }
 
 void loop() {
-  sleep_bod_disable(); // You don't operate when sleeping so
-  sleep_cpu();         // Minimize power usage
+  sleep_bod_disable();
+  sleep_cpu(); // Minimize power
 }
 
 ISR(PCINT0_vect) {
-  if (digitalRead(1))
-    return; // Display off
-  run();    // Display on
+  if (!digitalRead(1))
+    run(); // Display on
 }
 
 byte bcd2bin(byte bcd) {
   return bcd - 6 * (bcd >> 4);
+}
+
+uint8_t shiftInMod(uint8_t dataPin, uint8_t clockPin) {
+  uint8_t value = 0;
+
+  for (uint8_t i = 8; i; i--) {
+    value >>= 1;
+    if (PINB & _BV(dataPin))
+      value |= 0x80;
+    PORTB |= _BV(clockPin);
+    PORTB &= ~_BV(clockPin);
+  }
+
+  return value;
 }
 
 // reads DS1302 and calculates days left
@@ -82,13 +95,13 @@ word getDaysLeft() {
   pinMode(DAT, OUTPUT);
   shiftOut(DAT, SCK, LSBFIRST, 0xBF);
   pinMode(DAT, INPUT);
-  shiftIn(DAT, SCK, LSBFIRST);                   // second
-  shiftIn(DAT, SCK, LSBFIRST);                   // minute
-  shiftIn(DAT, SCK, LSBFIRST);                   // hour
-  byte d = bcd2bin(shiftIn(DAT, SCK, LSBFIRST)); // date
-  byte m = bcd2bin(shiftIn(DAT, SCK, LSBFIRST)); // month
-  shiftIn(DAT, SCK, LSBFIRST);                   // day of week
-  byte y = bcd2bin(shiftIn(DAT, SCK, LSBFIRST)); // year
+  shiftInMod(DAT, SCK);                   // second
+  shiftInMod(DAT, SCK);                   // minute
+  shiftInMod(DAT, SCK);                   // hour
+  byte d = bcd2bin(shiftInMod(DAT, SCK)); // date
+  byte m = bcd2bin(shiftInMod(DAT, SCK)); // month
+  shiftInMod(DAT, SCK);                   // day of week
+  byte y = bcd2bin(shiftInMod(DAT, SCK)); // year
 
   digitalWrite(CE, LOW);
 
