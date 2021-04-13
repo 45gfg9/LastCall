@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <EEPROM.h>
+#include <avr/eeprom.h>
 #include <avr/sleep.h>
 #include <avr/power.h>
 
@@ -65,10 +65,10 @@ byte bcd2bin(byte bcd) {
   return bcd - 6 * (bcd >> 4);
 }
 
-uint8_t shiftInMod(uint8_t dataPin, uint8_t clockPin) {
-  uint8_t value = 0;
+byte shiftInMod(byte dataPin, byte clockPin) {
+  byte value = 0;
 
-  for (uint8_t i = 8; i; i--) {
+  for (byte i = 8; i; i--) {
     value >>= 1;
     if (PINB & _BV(dataPin))
       value |= 0x80;
@@ -117,8 +117,7 @@ word getDaysLeft() {
     ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
   ds += d;                            // add remaining days (current month)
 
-  word targetDays;
-  EEPROM.get(EDADR, targetDays); // read config
+  word targetDays = eeprom_read_word((uint16_t *)EDADR); // read config
 
   word left = targetDays - ds;
 

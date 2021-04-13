@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 if len(sys.argv) < 2:
-    sys.exit("Please specify days")
+    sys.exit('Please specify days')
 
 PROG = 'usbasp'
 EDADR = 0
