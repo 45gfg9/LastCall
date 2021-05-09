@@ -1,6 +1,6 @@
 # LastCall
 
-I just want to be admitted to **\_**
+I just want to be admitted to _____
 
 ## Configurations
 
