@@ -1,7 +1,8 @@
-#include <Arduino.h>
 #include <avr/eeprom.h>
-#include <avr/sleep.h>
+#include <avr/interrupt.h>
 #include <avr/power.h>
+#include <avr/pgmspace.h>
+#include <avr/sleep.h>
 
 // 74HC595 Output Enable (LOW trigger)
 #define OE PB1
@@ -16,32 +17,36 @@
 
 #define DIGITS 3
 
+#define bit_set(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+#define bit_clear(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+
 // Days In Months
-const byte DIM[] PROGMEM {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+const uint8_t DIM[] PROGMEM {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 // 0~9 digits
 // Bitwise NOTed for common anode
-const byte p[] PROGMEM {
-    (byte)~0b11111100,
-    (byte)~0b01100000,
-    (byte)~0b11011010,
-    (byte)~0b11110010,
-    (byte)~0b01100110,
-    (byte)~0b10110110,
-    (byte)~0b10111110,
-    (byte)~0b11100000,
-    (byte)~0b11111110,
-    (byte)~0b11110110,
+const uint8_t p[] PROGMEM {
+    (uint8_t)~0b11111100,
+    (uint8_t)~0b01100000,
+    (uint8_t)~0b11011010,
+    (uint8_t)~0b11110010,
+    (uint8_t)~0b01100110,
+    (uint8_t)~0b10110110,
+    (uint8_t)~0b10111110,
+    (uint8_t)~0b11100000,
+    (uint8_t)~0b11111110,
+    (uint8_t)~0b11110110,
 };
 
 void run();
 
-void setup() {
-  DDRB = _BV(CE) | _BV(LCK) | _BV(SCK); // Set these pins to output
-  digitalWrite(LCK, HIGH);
+int main() {
+  DDRB = _BV(CE) | _BV(LCK) | _BV(SCK) | _BV(DAT); // Set these pins to output
 
-  bitSet(PCMSK, OE);   // INT on OE
-  bitSet(GIMSK, PCIE); // Enable PCINT
+  bit_set(PORTB, LCK); // LCK high
+
+  bit_set(PCMSK, OE);   // INT on OE
+  bit_set(GIMSK, PCIE); // Enable PCINT
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   power_all_disable(); // picoPower
 
@@ -49,57 +54,70 @@ void setup() {
 
   sleep_enable();
   sei();
-}
 
-void loop() {
-  sleep_bod_disable();
-  sleep_cpu(); // Minimize power
+  for (;;) {
+    sleep_bod_disable();
+    sleep_cpu(); // Minimize power
+  }
 }
 
 ISR(PCINT0_vect) {
-  if (!digitalRead(1))
-    run(); // Display on
+  if (bit_is_clear(PINB, OE)) // OE is low
+    run();                    // Display enabled
 }
 
-byte bcd2bin(byte bcd) {
+uint8_t bcd2bin(uint8_t bcd) {
   return bcd - 6 * (bcd >> 4);
 }
 
-byte shiftInMod(byte dataPin, byte clockPin) {
-  byte value = 0;
-
-  for (byte i = 8; i; i--) {
+void shift_out(uint8_t value) {
+  for (uint8_t i = 8; i; i--) {
+    if (value & 1)
+      bit_set(PORTB, DAT); // DAT high
+    else
+      bit_clear(PORTB, DAT); // DAT low
+    bit_set(PORTB, SCK);     // SCK high
+    bit_clear(PORTB, SCK);   // SCK low
     value >>= 1;
-    if (PINB & _BV(dataPin))
-      value |= 0x80;
-    PORTB |= _BV(clockPin);
-    PORTB &= ~_BV(clockPin);
+  }
+}
+
+uint8_t shift_in() {
+  uint8_t value = 0;
+
+  for (uint8_t i = 8; i; i--) {
+    value >>= 1;
+    bit_set(PORTB, SCK);       // SCK high
+    if (bit_is_set(PINB, DAT)) // DAT is high
+      value |= _BV(7);
+    bit_clear(PORTB, SCK); // SCK low
   }
 
   return value;
 }
 
-// reads DS1302 and calculates days left
-word getDaysLeft() {
+void run() {
   // Pt I
   // retrieve data from DS1302
 
-  digitalWrite(CE, HIGH);
+  bit_set(PORTB, CE); // CE high
 
   // Burst Read takes less space than
   // reading individual registers
-  pinMode(DAT, OUTPUT);
-  shiftOut(DAT, SCK, LSBFIRST, 0xBF);
-  pinMode(DAT, INPUT);
-  shiftInMod(DAT, SCK);                   // second
-  shiftInMod(DAT, SCK);                   // minute
-  shiftInMod(DAT, SCK);                   // hour
-  byte d = bcd2bin(shiftInMod(DAT, SCK)); // date
-  byte m = bcd2bin(shiftInMod(DAT, SCK)); // month
-  shiftInMod(DAT, SCK);                   // day of week
-  byte y = bcd2bin(shiftInMod(DAT, SCK)); // year
+  // DAT set to output before
+  shift_out(0xBF);
 
-  digitalWrite(CE, LOW);
+  bit_clear(DDRB, DAT); // DAT in
+
+  shift_in();                      // second
+  shift_in();                      // minute
+  shift_in();                      // hour
+  uint8_t d = bcd2bin(shift_in()); // date
+  uint8_t m = bcd2bin(shift_in()); // month
+  shift_in();                      // day of week
+  uint8_t y = bcd2bin(shift_in()); // year
+
+  bit_clear(PORTB, CE); // CE low
 
   // Pt II
   // convert y/m/d to days since 2021.1.1
@@ -109,7 +127,7 @@ word getDaysLeft() {
   // this logic is very specific to base date (2021.1.1)
   // rewrite this part if you have a different base date
   // "I don't know why, it just works"
-  word ds = -1;                       // begin with Jan 1
+  uint16_t ds = -1;                   // begin with Jan 1
   if (y != 21)                        // if not (20)21
     for (; y > 21; y--)               // for each year
       ds += 365;                      // add extra 365 days
@@ -117,26 +135,21 @@ word getDaysLeft() {
     ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
   ds += d;                            // add remaining days (current month)
 
-  word targetDays = eeprom_read_word((uint16_t *)EDADR); // read config
+  const uint16_t target = eeprom_read_word((uint16_t *)EDADR); // read config
 
-  word left = targetDays - ds;
+  uint16_t left = target - ds;
+  if (left < 0)
+    left = 0;
 
-  return left > 0 ? left : 0;
-}
+  // Pt III
+  // display in format %03d
+  // least significant digit first
 
-// output val to display
-// least significant digit first
-void disp(word val) {
-  pinMode(DAT, OUTPUT);
-  digitalWrite(LCK, LOW);
-  // %03d
-  for (byte i = DIGITS; i; i--) {
-    shiftOut(DAT, SCK, LSBFIRST, pgm_read_byte(p + (val % 10)));
-    val /= 10;
+  bit_set(DDRB, DAT);    // DAT out
+  bit_clear(PORTB, LCK); // LCK low
+  for (uint8_t i = DIGITS; i; i--) {
+    shift_out(pgm_read_byte(p + (left % 10)));
+    left /= 10;
   }
-  digitalWrite(LCK, HIGH);
-}
-
-void run() {
-  disp(getDaysLeft());
+  bit_set(PORTB, LCK); // LCK high
 }

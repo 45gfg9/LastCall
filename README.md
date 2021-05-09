@@ -1,8 +1,8 @@
 # LastCall
 
-I just want to be admitted to _____
+I just want to be admitted to **\_**
 
 ## Configurations
 
 - HFuse = 0xFB
-- LFuse = 0x33
+- LFuse = 0x3B
