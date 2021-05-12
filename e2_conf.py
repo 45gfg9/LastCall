@@ -16,6 +16,6 @@ quit
 """.strip().encode()
 
 subprocess.run(
-    shlex.split(f'avrdude -c{PROG} -pt13 -t'),
+    shlex.split(f'avrdude -c{PROG} -pt13 -B4kHz -t'),
     input=scr
 )
