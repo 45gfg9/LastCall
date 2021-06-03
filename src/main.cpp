@@ -128,9 +128,8 @@ void run() {
   // rewrite this part if you have a different base date
   // "I don't know why, it just works"
   uint16_t ds = -1;                   // begin with Jan 1
-  if (y != 21)                        // if not (20)21
-    for (; y > 21; y--)               // for each year
-      ds += 365;                      // add extra 365 days
+  while (y-- > 21)                    // for each year not 2021
+    ds += 365;                        // add extra 365 days
   for (m--; m; m--)                   // for each month unspent this year
     ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
   ds += d;                            // add remaining days (current month)
