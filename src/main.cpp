@@ -136,7 +136,7 @@ void run() {
 
   const uint16_t target = eeprom_read_word((uint16_t *)EDADR); // read config
 
-  uint16_t left = target - ds;
+  int left = target - ds;
   if (left < 0)
     left = 0;
 
