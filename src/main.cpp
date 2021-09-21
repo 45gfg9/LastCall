@@ -122,12 +122,12 @@ void run() {
   // Pt II
   // convert y/m/d to days since 2021.1.1
 
-  y -= 21;                 // Travel 21 years
-  if (m > 2 && y % 4 == 0) // if current year is leap year
-    d++;                   // and February has spent
+  y -= 21; // travel 21 years
+  if (m <= 2 || y % 4)
+    d--; // equivalent to add 1 day if leap
   while (--m)
     d += pgm_read_byte(DIM + m - 1); // add unspent months
-  d += 365 * y + (y + 3) / 4 - 1;    // add years and leap days
+  d += 365 * y + (y + 3) / 4;        // add years and leap days
 
   const uint16_t target = eeprom_read_word((uint16_t *)EDADR); // read config
 
