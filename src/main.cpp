@@ -121,22 +121,17 @@ void run() {
 
   // Pt II
   // convert y/m/d to days since 2021.1.1
-  // no leap handle to save precious flash
-  // I just want it to work to 2022
 
-  // this logic is very specific to base date (2021.1.1)
-  // rewrite this part if you have a different base date
-  // "I don't know why, it just works"
-  uint16_t ds = -1;                   // begin with Jan 1
-  while (y-- > 21)                    // for each year not 2021
-    ds += 365;                        // add extra 365 days
-  for (m--; m; m--)                   // for each month unspent this year
-    ds += pgm_read_byte(DIM + m - 1); // add days corresponding to month
-  ds += d;                            // add remaining days (current month)
+  y -= 21;                 // Travel 21 years
+  if (m > 2 && y % 4 == 0) // if current year is leap year
+    d++;                   // and February has spent
+  while (--m)
+    d += pgm_read_byte(DIM + m - 1); // add unspent months
+  d += 365 * y + (y + 3) / 4 - 1;    // add years and leap days
 
   const uint16_t target = eeprom_read_word((uint16_t *)EDADR); // read config
 
-  int left = target - ds;
+  int left = target - d;
   if (left < 0)
     left = 0;
 

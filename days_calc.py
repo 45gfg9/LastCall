@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# Warning
-# This script counts leap year while the sketch doesn't
-
 # A bare Date class for calculation
 class Date:
     def __init__(self, y: int, m: int, d: int):
@@ -58,7 +55,8 @@ class Date:
         ds += dst.d - src.d
         return -ds if neg else ds
 
+
 if __name__ == '__main__':
     base = Date(2021, 1, 1)
-    target = Date(2022, 6, 7) # Change this to your desired date
+    target = Date(2022, 6, 7)  # Change this to your desired date
     print(target - base)
