@@ -21,6 +21,6 @@ quit
 """.strip().encode()
 
 subprocess.run(
-    shlex.split(f'avrdude -c{PROG} -P{PORT} -B8 -pt13 -t'),
+    shlex.split(f'avrdude -c{PROG} -P{PORT} -pt13 -t'),
     input=scr
 )
