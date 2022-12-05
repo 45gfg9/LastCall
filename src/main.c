@@ -21,11 +21,11 @@
 #define bit_clear(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 
 // Days In Months
-const uint8_t DIM[] PROGMEM {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+const uint8_t DIM[] PROGMEM = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 // 0~9 digits
 // Bitwise NOTed for common anode
-const uint8_t p[] PROGMEM {
+const uint8_t p[] PROGMEM = {
     (uint8_t)~0b11111100,
     (uint8_t)~0b01100000,
     (uint8_t)~0b11011010,
@@ -37,34 +37,6 @@ const uint8_t p[] PROGMEM {
     (uint8_t)~0b11111110,
     (uint8_t)~0b11110110,
 };
-
-void run();
-
-int main() {
-  DDRB = _BV(CE) | _BV(LCK) | _BV(SCK) | _BV(DAT); // Set these pins to output
-
-  bit_set(PORTB, LCK); // LCK high
-
-  bit_set(PCMSK, OE);   // INT on OE
-  bit_set(GIMSK, PCIE); // Enable PCINT
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-  power_all_disable(); // picoPower
-
-  run();
-
-  sleep_enable();
-  sei();
-
-  for (;;) {
-    sleep_bod_disable();
-    sleep_cpu(); // Minimize power
-  }
-}
-
-ISR(PCINT0_vect) {
-  if (bit_is_clear(PINB, OE)) // OE is low
-    run();                    // Display enabled
-}
 
 uint8_t bcd2bin(uint8_t bcd) {
   return bcd - 6 * (bcd >> 4);
@@ -146,4 +118,30 @@ void run() {
     left /= 10;
   }
   bit_set(PORTB, LCK); // LCK high
+}
+
+int main() {
+  DDRB = _BV(CE) | _BV(LCK) | _BV(SCK) | _BV(DAT); // Set these pins to output
+
+  bit_set(PORTB, LCK); // LCK high
+
+  bit_set(PCMSK, OE);   // INT on OE
+  bit_set(GIMSK, PCIE); // Enable PCINT
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  power_all_disable(); // picoPower
+
+  run();
+
+  sleep_enable();
+  sei();
+
+  for (;;) {
+    sleep_bod_disable();
+    sleep_cpu(); // Minimize power
+  }
+}
+
+ISR(PCINT0_vect) {
+  if (bit_is_clear(PINB, OE)) // OE is low
+    run();                    // Display enabled
 }
